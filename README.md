@@ -43,13 +43,23 @@ UU 开启加速时会默认插入全局 DNS 劫持规则：
 
 ## 安装与使用
 
-### Arch Linux (PKGBUILD)
+### Arch Linux (AUR)
 
-本项目提供 PKGBUILD（包名 `uuplugin-dns-patched-bin`），并与原版 `uuplugin-bin` 声明冲突与提供关系：
+软件包已发布至 AUR：[`uuplugin-dns-patched-bin`](https://aur.archlinux.org/packages/uuplugin-dns-patched-bin)。
+
+可以使用常用的 AUR 助手直接安装（与原版 `uuplugin-bin` 声明冲突并自动替代）：
 
 ```bash
-git clone https://github.com/Koswu/uuplugin-dns-patched.git
-cd uuplugin-dns-patched
+yay -S uuplugin-dns-patched-bin
+# 或
+paru -S uuplugin-dns-patched-bin
+```
+
+也可以通过 AUR 仓库手动构建：
+
+```bash
+git clone https://aur.archlinux.org/uuplugin-dns-patched-bin.git
+cd uuplugin-dns-patched-bin
 makepkg -si
 ```
 
