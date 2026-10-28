@@ -1,73 +1,86 @@
 # uuplugin-dns-patched
 
-为 UU Steam Deck Linux 插件添加 Tailscale DNS 兼容补丁，无需额外常驻监听服务。
+[![License: 0BSD](https://img.shields.io/badge/License-0BSD-blue.svg)](LICENSE)
 
-UU 在启动加速时会插入 IPv4 DNS 重定向及 IPv6 DNS 阻断规则，可能使 Tailscale DNS 无响应，进而影响普通网页和内网域名解析。本工具仅在构建副本中修改这些规则：
+为 UU 加速器 Steam Deck / Linux 插件 (`uuplugin`) 提供 Tailscale DNS 兼容补丁。
 
-- IPv4 DNS DNAT 的添加、删除均排除 `100.64.0.0/10`。
-- IPv6 TCP/UDP DNS DROP 的添加、删除均排除 `fd7a:115c:a1e0::/48`。
+无需任何额外常驻守护进程或转发服务，直接修补 UU 内置的 iptables 规则模板，在 DNS 重定向与阻断中排除 Tailscale 地址段，使游戏加速与 MagicDNS / Tailnet 局域网解析完美共存。
 
-补丁不更改系统 DNS、Tailscale 设置或路由，不包含额外守护进程。只有安装后运行 UU 时，UU 才会按修改后的逻辑管理规则。公共 DNS 仍由 UU 原逻辑处理。
+---
 
-## 支持范围
+## 背景与原理
 
-仅支持 **UU 14.2.2 / Linux x86_64** 的两种固定文件档案（官方原始文件及先前 AUR 安装文件）。完整输入、输出 SHA256 都必须匹配；版本号相同但内容不同也会拒绝。不要只修改版本号或绕过校验来支持新版。
+UU 开启加速时会默认插入全局 DNS 劫持规则：
+- **IPv4**：将所有出站 DNS 请求重定向（DNAT）至其本地解析服务；
+- **IPv6**：直接阻断（DROP）所有出站 DNS 请求。
 
-| 文件 | SHA256 |
-| --- | --- |
-| 网易官方 `uu.tar.gz` | `6881c8bd388630edfdbceef1f723bf43cf75b0ce5122ee891e99d2fb86c96652` |
-| 官方原始 `uuplugin` | `6643c6cde6ff2d38e9817c916adc7df75fa242f00f25befa7353ab041f152482` |
-| 官方文件打补丁后（本包安装值） | `0e82db28ee7a29eb27e729887060fa8c508cfd1010e612e7280828d85b80c357` |
-| AUR 安装原始 `uuplugin` | `28bf89e3b18aed87f7eec759bf5441143c06a0b00306a02cd5184869bf2f9668` |
-| AUR 安装文件打补丁后 | `3c90b655ab7fcf3f0368b0b0ff7596d9335d522e1da70ea74aaa31fd30d1c248` |
+这会导致 Tailscale 的 MagicDNS 及 Tailnet 内网域名解析全部超时失效。
 
-这是非官方补丁，与网易及 Tailscale 无隶属关系。只验证了 Steam 商店加速；不保证所有游戏、网络环境或更新后的 UU 行为兼容。
+本项目通过二进制修补（Binary Patch）`uuplugin` 的规则模板字符串：
+- **IPv4 DNS DNAT**：规则添加/删除时均排除 `100.64.0.0/10`；
+- **IPv6 DNS DROP**：规则添加/删除时均排除 `fd7a:115c:a1e0::/48`。
 
-## Arch Linux 构建与安装
+修补仅限定长调整规则模板，不触碰登录、节点调度等业务逻辑。公共 DNS 仍由 UU 正常加速管理。
 
-计划使用的 AUR 包名：`uuplugin-dns-patched-bin`。仓库已提供 PKGBUILD 和 `.SRCINFO`，不代表已经发布到 AUR。
+---
 
-```sh
+## 支持版本
+
+目前严格锁定并验证以下版本（二进制输入与输出均校验 SHA256）：
+
+- **UU 版本**：`14.2.2` (Linux x86_64)
+
+| 适用文件 | 类别 | SHA256 |
+| --- | --- | --- |
+| 官方原始 `uuplugin` | 原版 | `6643c6cde6ff2d38e9817c916adc7df75fa242f00f25befa7353ab041f152482` |
+| 官方原版修补后（本包产物） | 补丁后 | `0e82db28ee7a29eb27e729887060fa8c508cfd1010e612e7280828d85b80c357` |
+| 旧版 AUR 已安装 `uuplugin`* | 原版 | `28bf89e3b18aed87f7eec759bf5441143c06a0b00306a02cd5184869bf2f9668` |
+| 旧版 AUR 文件修补后 | 补丁后 | `3c90b655ab7fcf3f0368b0b0ff7596d9335d522e1da70ea74aaa31fd30d1c248` |
+
+> *\*注：旧版 AUR 安装包多了打包时注入的 debug link，其 `.text` 与 `.rodata` 段与官方原版逐字节一致。*
+
+---
+
+## 安装与使用
+
+### Arch Linux (PKGBUILD)
+
+本项目提供 PKGBUILD（包名 `uuplugin-dns-patched-bin`），并与原版 `uuplugin-bin` 声明冲突与提供关系：
+
+```bash
 git clone https://github.com/Koswu/uuplugin-dns-patched.git
 cd uuplugin-dns-patched
-makepkg -s
+makepkg -si
 ```
 
-构建会从网易下载固定版本，校验后离线打补丁并运行测试。`makepkg -s` 可能安装构建依赖，但不会安装或启动 UU。检查 PKGBUILD 与生成的包后再安装：
+> **注意：切换或回退服务前**
+> 1. 先在 UU 移动端 App 中**停止当前加速**；
+> 2. 停止服务：`sudo systemctl stop uuplugin.service`；
+> 3. 安装补丁包后，按需启动：`sudo systemctl start uuplugin.service`。
 
-```sh
-sudo pacman -U ./uuplugin-dns-patched-bin-14.2.2-1-x86_64.pkg.tar.zst
-```
+### 独立使用补丁脚本
 
-此包提供 `uuplugin-bin`，与 `uuplugin-bin`、`uuplugin` 互斥。`/etc/uuplugin/uu.conf` 使用 pacman 的配置备份机制；包不会自动启动、启用或重启服务，也不修改 Tailscale 偏好。
+也可以直接使用 Python 脚本对指定二进制打补丁：
 
-从原版切换前，应先在 UU App 停止加速，再停止服务，避免旧规则遗留：
+```bash
+# 生成补丁文件（目标路径必须不存在）
+python3 patch_uuplugin_tailnet.py /path/to/original/uuplugin /path/to/uuplugin-patched
 
-```sh
-sudo systemctl stop uuplugin.service
-# 安装补丁包后，按需启动
-sudo systemctl start uuplugin.service
-```
-
-在 App 中重新加速后，验证普通网页、Steam 以及自己的 Tailnet 内网域名。需要使用 Tailscale DNS 时自行启用 `tailscale set --accept-dns=true`；此设置是否适合你的网络应单独确认。
-
-回退时同样先停止加速和服务，再安装原版 `uuplugin-bin`。不使用无差别清空 iptables 的方式恢复网络。
-
-## 单独生成补丁副本
-
-```sh
-python3 patch_uuplugin_tailnet.py /path/to/original/uuplugin /tmp/uuplugin-patched
+# 运行单元测试
 python3 -m unittest -v
 ```
 
-目标必须不存在。工具拒绝覆盖源文件、已有目标、目标符号链接或硬链接；不需要 root，不修改已安装的程序。
+---
 
-## 验证与维护
+## 相关文档
 
-隔离虚拟机中的真实 UU App 启停验证了规则清理、重建，以及 Tailscale DNS 和 Steam 流量路径。94 项 DNS 检查通过；1776 次长采样查询出现两次孤立的 1 秒超时，随后恢复，因此不承诺零中断。[实测与补丁说明](docs/PATCH.md)
+- [补丁技术细节与实测记录](docs/PATCH.md)
+- [AUR 打包与发布规范](docs/AUR.md)
+- [构建与兼容性验证记录](docs/BUILD.md)
 
-[发布 AUR 的步骤和检查项](docs/AUR.md)，[本次构建结果及 namcap 未通过项](docs/BUILD.md)。本仓库不上传官方或修改后的 UU 二进制；AUR 构建时从网易下载原版。
+---
 
-## 许可证
+## 许可证与声明
 
-本项目自行编写的补丁工具、测试及打包文件使用 [0BSD](LICENSE)。网易的 `uuplugin`、`xuplugin-guardian` 和配置仍受其自身条款约束，0BSD 不适用于这些文件。官方压缩包未附带许可证文本；**公开下载不等于允许修改或再分发**。本项目尚未确认上游条款对该补丁发布方式的许可，AUR 正式提交前须核对，不宣称已满足上游授权要求。
+- 本项目自主编写的补丁工具、测试代码及 PKGBUILD 遵循 [0BSD 许可证](LICENSE)。
+- `uuplugin` 等二进制文件与商标归网易公司所有。本项目为第三方开源补丁方案，与网易及 Tailscale 官方无任何隶属关系。
