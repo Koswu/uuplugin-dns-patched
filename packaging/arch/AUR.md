@@ -47,8 +47,9 @@ makepkg --printsrcinfo > .SRCINFO
 git clone ssh://aur@aur.archlinux.org/uuplugin-dns-patched-bin.git /tmp/aur-pkg
 cd /tmp/aur-pkg
 
-# 拷贝发布文件（仅提交 PKGBUILD、.SRCINFO、补丁脚本、服务文件及许可证）
-cp /path/to/uuplugin-dns-patched/{PKGBUILD,.SRCINFO,LICENSE,uuplugin.service,patch_uuplugin_tailnet.py,test_uuplugin_patch.py} .
+# 拷贝发布文件（PKGBUILD、.SRCINFO、服务文件来自 packaging/arch/，补丁脚本与许可证来自仓库根目录）
+cp packaging/arch/{PKGBUILD,.SRCINFO,uuplugin.service} /tmp/aur-pkg/
+cp LICENSE patch_uuplugin_tailnet.py test_uuplugin_patch.py /tmp/aur-pkg/
 
 # 检查并推送
 git add PKGBUILD .SRCINFO LICENSE uuplugin.service patch_uuplugin_tailnet.py test_uuplugin_patch.py
